@@ -126,7 +126,7 @@ else
         CURRENT_ROOT=/dev/mmcblk0p3
     else
         fail "ERROR: Fail to found current root device. Continue to stardard init process"
-        exec /sbin/init "$@"
+        exec /sbin/init
     fi
 fi
 
