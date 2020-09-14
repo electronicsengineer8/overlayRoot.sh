@@ -86,32 +86,57 @@ makedir "/mnt/rw/work"
 makedir /"mnt/newroot"
 
 # mount root filesystem readonly 
-rootDev=`awk '$2 == "/" {print $1}' /etc/fstab`
-rootMountOpt=`awk '$2 == "/" {print $4}' /etc/fstab`
-rootFsType=`awk '$2 == "/" {print $3}' /etc/fstab`
+# rootDev=`awk '$2 == "/" {print $1}' /etc/fstab`
+# rootMountOpt=`awk '$2 == "/" {print $4}' /etc/fstab`
+# rootFsType=`awk '$2 == "/" {print $3}' /etc/fstab`
+# info "rootDev: ${rootDev}"
+# info "rootMountOpt: ${rootMountOpt}"
+# info "rootFsType: ${rootFsType}"
+# info "check if we can locate the root device based on fstab"
+# blkid $rootDev
+# if [ $? -gt 0 ]; then
+#     info "no success, try if a filesystem with label 'rootfs' is avaialble"
+#     rootDevFstab=$rootDev
+#     rootDev=`blkid -L "rootfs"`
+#     if [ $? -gt 0 ]; then
+#         info "no luck either, try to further parse fstab's root device definition"
+#         info "try if fstab contains a PARTUUID definition"
+#         echo "$rootDevFstab" | grep 'PARTUUID=\(.*\)-\([0-9]\{2\}\)'
+#         info "rootDevFstab: ${rootDevFstab}"
+# 	    checkfail "could not find a root filesystem device in fstab. Make sure that fstab contains a device definition or a PARTUUID entry for / or that the root filesystem has a label 'rootfs' assigned to it"
+#         device=""
+#         partition=""
+#         eval `echo "$rootDevFstab" | sed -e 's/PARTUUID=\(.*\)-\([0-9]\{2\}\)/device=\1;partition=\2/'`
+#         rootDev=`blkid -t "PTUUID=$device" | awk -F : '{print $1}'`p$(($partition))
+#         blkid $rootDev
+# 	    checkfail "The PARTUUID entry in fstab could not be converted into a valid device name. Make sure that fstab contains a device definition or a PARTUUID entry for / or that the root filesystem has a label 'rootfs' assigned to it"
+#     fi
+# fi
+
+## Get current rootfs device
+info "Get current rootfs device from cmdline"
+cat /proc/cmdline | grep -q mmcblk0p2
+
+if [ $? -eq 0 ]; then
+    CURRENT_ROOT=/dev/mmcblk0p2
+else
+    cat /proc/cmdline | grep -q mmcblk0p3
+
+    if [ $? -eq 0 ]; then
+        CURRENT_ROOT=/dev/mmcblk0p3
+    else
+        fail "ERROR: Fail to found current root device. Continue to stardard init process"
+        exec /sbin/init "$@"
+    fi
+fi
+
+rootDev="${CURRENT_ROOT}"
+rootMountOpt="defaults"
+rootFsType="ext4"
 info "rootDev: ${rootDev}"
 info "rootMountOpt: ${rootMountOpt}"
 info "rootFsType: ${rootFsType}"
 info "check if we can locate the root device based on fstab"
-blkid $rootDev
-if [ $? -gt 0 ]; then
-    info "no success, try if a filesystem with label 'rootfs' is avaialble"
-    rootDevFstab=$rootDev
-    rootDev=`blkid -L "rootfs"`
-    if [ $? -gt 0 ]; then
-        info "no luck either, try to further parse fstab's root device definition"
-        info "try if fstab contains a PARTUUID definition"
-        echo "$rootDevFstab" | grep 'PARTUUID=\(.*\)-\([0-9]\{2\}\)'
-        info "rootDevFstab: ${rootDevFstab}"
-	    checkfail "could not find a root filesystem device in fstab. Make sure that fstab contains a device definition or a PARTUUID entry for / or that the root filesystem has a label 'rootfs' assigned to it"
-        device=""
-        partition=""
-        eval `echo "$rootDevFstab" | sed -e 's/PARTUUID=\(.*\)-\([0-9]\{2\}\)/device=\1;partition=\2/'`
-        rootDev=`blkid -t "PTUUID=$device" | awk -F : '{print $1}'`p$(($partition))
-        blkid $rootDev
-	    checkfail "The PARTUUID entry in fstab could not be converted into a valid device name. Make sure that fstab contains a device definition or a PARTUUID entry for / or that the root filesystem has a label 'rootfs' assigned to it"
-    fi
-fi
 
 info "Mounting ${rootDev} at /mnt/lower"
 mount -t ${rootFsType} -o ${rootMountOpt},ro ${rootDev} /mnt/lower
@@ -127,7 +152,8 @@ makedir "/mnt/newroot/rw"
 
 # remove root mount from fstab (this is already a non-permanent modification)
 info "Removing root mountpoint from fstab (temporary change already)"
-grep -v "$rootDev" /mnt/lower/etc/fstab > /mnt/newroot/etc/fstab
+#grep -v "$rootDev" /mnt/lower/etc/fstab > /mnt/newroot/etc/fstab
+grep -v "/dev/mmcblk0p2" /mnt/lower/etc/fstab > /mnt/newroot/etc/fstab
 echo "#the original root mount has been removed by overlayRoot.sh" >> /mnt/newroot/etc/fstab
 echo "#this is only a temporary modification, the original fstab" >> /mnt/newroot/etc/fstab
 echo "#stored on the disk can be found in /ro/etc/fstab" >> /mnt/newroot/etc/fstab
